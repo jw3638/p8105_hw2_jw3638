@@ -70,9 +70,79 @@ merge2 <-
   left_join(merge1, unemployment, by = join_by(year, month)) |>
   select(year, month, president, close, unemployment_percentage, everything())
 
-knitr::kable(head(merge2, 10))
+knitr::kable(head(merge2, 5))
 ```
-Dataset 1: pols-month shows data from January to May in 1947 for gov_gop (the number of republican governors on the associated date), rep_gop (" representatives), gov_dem ("democratic governors), sen_dem ("democratic senators), rep_dem ("democratic representatives), and president (both republican and democratic presidents). 
-Dataset 2: snp shows data from July to March in 2015 of the the closing values of the S&P stock index on the associated date. 
-Dataset 3: unemployment shows data from January to May in 1948 for unemployment_percentage.
-Resulting dataset (merged): shows data from months January to October in 1947 with columns close, unemployment_percentage, gov_gop, sen_gop, rep_gop, gov_dem, sen_dem, rep_dem.
+Dataset 1: pols-month shows data from 1947 per month for gov_gop (the number of republican governors on the associated date), rep_gop (" representatives), gov_dem ("democratic governors), sen_dem ("democratic senators), rep_dem ("democratic representatives), and president (both republican and democratic presidents). 
+Dataset 2: snp shows data from 2015 of the the closing values of the S&P stock index on the associated date per month. 
+Dataset 3: unemployment shows data from 1948 for unemployment_percentage per month.
+Resulting dataset (merged): shows data from 1947 with columns close, unemployment_percentage, gov_gop, sen_gop, rep_gop, gov_dem, sen_dem, rep_dem per month.
+
+##Problem 2
+
+```{r}
+#Upload and Read Mr. Trash Wheel excel file, omit non-data entries (rows with notes / figures; columns containing notes) using arguments in read_excel.
+mr_trashwheels <- 
+  read_excel("data/202509+TrashWheel_Collection_Data.xlsx", 
+             sheet = "Mr. Trash Wheel",
+             range = "A2:N710") |>
+  janitor::clean_names() |>
+  #Omit rows that do not include dumpster-specific data 
+  filter(!is.na(dumpster)) |> 
+  mutate(
+    sports_balls = as.integer(round(sports_balls))  
+  ) |>
+  mutate(identity = "mr", 
+    year = as.numeric(year)
+  )
+knitr::kable(head(mr_trashwheels, 5))
+```
+
+```{r}
+#Upload and Read Professor Trash Wheel excel file, omit non-data entries (rows with notes / figures; columns containing notes) using arguments in read_excel.
+professor_trashwheels <- 
+  read_excel("data/202509+TrashWheel_Collection_Data.xlsx", 
+             sheet = "Professor Trash Wheel",
+             range = "A2:M123") |>
+  janitor::clean_names() |>
+  filter(!is.na(dumpster)) |>
+  mutate(identity = "professor", 
+    year = as.numeric(year)
+  )
+knitr::kable(head(professor_trashwheels, 5))
+```
+
+```{r}
+#Upload and Read Gwynns excel file, omit non-data entries (rows with notes / figures; columns containing notes) using arguments in read_excel.
+gwynn_trashwheels <- 
+    read_excel("data/202509+TrashWheel_Collection_Data.xlsx", 
+             sheet = "Gwynns Falls Trash Wheel",
+             range = "A2:L352") |>
+  janitor::clean_names() |>
+  filter(!is.na(dumpster)) |>
+  mutate(
+    identity = "gwynn", 
+    year = as.numeric(year)
+  )
+knitr::kable(head(gwynn_trashwheels, 5))
+```
+
+```{r}
+#Combine professor 1. Trash Wheel and Gwynnda datasets and 2. combine with the Mr. Trash Wheel dataset to produce a single dataset.
+trashwheels <- bind_rows(mr_trashwheels, professor_trashwheels, gwynn_trashwheels)
+
+#what was the total weight of trash collected by Professor Trash Wheel?
+totalweightprof <- professor_trashwheels |>
+  summarise(total_weight = sum(weight_tons, na.rm = TRUE))
+
+#What was the total number of cigarette butts collected by Gwynnda in June of 2022?
+tot_gwynn_cigbutts <- gwynn_trashwheels |>
+  filter(year == 2022, month == "June") |>
+  summarise(tot_gwynn_cigbutts = sum(cigarette_butts, na.rm = TRUE))
+
+knitr::kable(head(trashwheels, 10))
+
+totalweightprof
+tot_gwynn_cigbutts
+```
+The three datasets, Mr, Professor, and Gwynn before combining looked really similar after I cleaned them. They all have columns dumpster, month, year, date, weight_tons, volume_cubic_yards, plastic_bottles, polystyrene, cigarette_butts, glass_bottles, plastic_bags, wrappers, homes_powered, identity (which is mr, professor, or gwynn). There were a few columns that were inconsistent: Mr had sports_balls. The total weight of trash collected by Professor Trash Wheel is 256 and the total number of cigarette butts collected by Gwynnda in June of 2022 is 18120.
+
