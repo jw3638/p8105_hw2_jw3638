@@ -1,0 +1,78 @@
+---
+title: "p8105_hw2_jw3638"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(lubridate)
+```
+
+##Problem 1
+Clean pols-month.csv data: Break up the variable mon into integer variables year, month, and day; replace month number with month name; create a president variable taking values gop and dem, and remove prez_dem and prez_gop; and remove the day variable.
+```{r}
+pols =
+  read_csv("data/fivethirtyeight_datasets/pols-month.csv") |>
+  separate(mon, into = c("year", "month", "day"), sep = "-", convert = TRUE) |>
+  mutate(
+    month = month.name[month],
+    year = as.integer(year),
+    president = case_when(
+      prez_gop == 1 ~ "gop",
+      prez_dem == 1 ~ "dem"
+    )
+  ) |>
+  select(-prez_dem, -prez_gop, -day)
+
+#For nice display of data in knit doc:
+knitr::kable(head(pols, 5))
+```
+
+Clean snp.csv data. Arrange according to year and month.
+```{r}
+snp = 
+  read_csv("data/fivethirtyeight_datasets/snp.csv") |>
+  mutate(date = mdy(date)) |>
+  separate(date, into = c("year", "month", "day"), sep = "-", convert = TRUE) |>
+  mutate(
+    month = month.name[month],
+    year = as.integer(year)
+  ) |>
+  select(year, month, close)
+
+knitr::kable(head(snp, 5))
+```
+
+Clean unemployment.csv data. Tidy it up so that it can be merged with pols-month and csv: switch from “wide” to “long” format and label formatting is consistent
+```{r}
+unemployment = 
+  read_csv("data/fivethirtyeight_datasets/unemployment.csv") |>
+  pivot_longer(
+    cols = Jan:Dec,
+    names_to = "month",
+    values_to = "unemployment_percentage"
+  ) |>
+  mutate(
+    month = month.name[match(month, month.abb)],
+    year = as.integer(Year)
+  ) |>
+  select(year, month, unemployment_percentage)
+
+knitr::kable(head(unemployment, 5))
+```
+
+Merging: Join the pols-month into snp, and merge unemployment into (pols-month in snp)
+```{r}
+merge1 <- 
+  left_join(pols, snp, by = join_by(year, month))
+merge2 <- 
+  left_join(merge1, unemployment, by = join_by(year, month)) |>
+  select(year, month, president, close, unemployment_percentage, everything())
+
+knitr::kable(head(merge2, 10))
+```
+Dataset 1: pols-month shows data from January to May in 1947 for gov_gop (the number of republican governors on the associated date), rep_gop (" representatives), gov_dem ("democratic governors), sen_dem ("democratic senators), rep_dem ("democratic representatives), and president (both republican and democratic presidents). 
+Dataset 2: snp shows data from July to March in 2015 of the the closing values of the S&P stock index on the associated date. 
+Dataset 3: unemployment shows data from January to May in 1948 for unemployment_percentage.
+Resulting dataset (merged): shows data from months January to October in 1947 with columns close, unemployment_percentage, gov_gop, sen_gop, rep_gop, gov_dem, sen_dem, rep_dem.
