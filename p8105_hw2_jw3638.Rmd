@@ -146,3 +146,89 @@ tot_gwynn_cigbutts
 ```
 The three datasets, Mr, Professor, and Gwynn before combining looked really similar after I cleaned them. They all have columns dumpster, month, year, date, weight_tons, volume_cubic_yards, plastic_bottles, polystyrene, cigarette_butts, glass_bottles, plastic_bags, wrappers, homes_powered, identity (which is mr, professor, or gwynn). There were a few columns that were inconsistent: Mr had sports_balls. The total weight of trash collected by Professor Trash Wheel is 256 and the total number of cigarette butts collected by Gwynnda in June of 2022 is 18120.
 
+##Problem 3
+
+```{r}
+#Create a single, well-organized dataset
+zipcodes_df <- 
+  read_csv("data/zillow_data/Zip Codes.csv") |>
+  janitor::clean_names() |>
+#to get consistency in formatting
+  mutate(file_date = as.Date(file_date, format = "%m/%d/%y"))
+knitr::kable(head(zipcodes_df, 5))
+
+```
+
+```{r}
+zori_df <- 
+  read_csv("data/zillow_data/Zip_zori_uc_sfrcondomfr_sm_month_NYC.csv") |>
+  janitor::clean_names() |>
+  rename(zip_code = region_name, county = county_name) |>
+  pivot_longer(
+    cols = starts_with("x20"),
+    names_to = "date",
+    values_to = "rent_price"
+  ) |>
+  mutate(
+    county = str_remove(county, " County$"),
+    date = str_remove(date, "^x"), 
+    date = ymd(date) 
+  )
+
+knitr::kable(head(zori_df, 5))  
+```
+
+```{r}
+#merge to create a single, final dataset
+zillowdata_df <- left_join(zori_df, zipcodes_df, by= c("zip_code"), relationship =
+  "many-to-many")
+
+zillowdata_df <- zillowdata_df |>
+  select(date, zip_code, neighborhood, county.x, city, state, rent_price) |>
+  rename(county = county.x)
+
+knitr::kable(head(zillowdata_df, 10))
+```
+
+```{r}
+#Summary
+observations <- nrow(zillowdata_df)
+distinct_zips = n_distinct(zillowdata_df$zip_code)
+distinct_neighborhoods = n_distinct(zillowdata_df$neighborhood)
+observations
+distinct_zips
+distinct_neighborhoods
+
+zips_missing_zori <- zipcodes_df |>
+  anti_join(zori_df, by = "zip_code") |>
+  nrow()
+
+knitr::kable(head(zips_missing_zori, 10))
+```
+
+The final dataset contains 17516 observations with 149 unique zip codes across 43 distinct neighborhoods. An additional 171 zip codes that are in the metadata are not in the Zillow rental data, which probably means those areas either don't have enough rental listings or weren't included in Zillow's data collection for this specific dataset.
+
+```{r}
+#Comparing rental prices
+price_change <- 
+  zillowdata_df |>
+  filter(date %in% c("2020-01-31", "2021-01-31")) |>
+  group_by(zip_code, neighborhood, county) |>
+  reframe(
+    jan2020_price = rent_price[date == "2020-01-31"],
+    jan2021_price = rent_price[date == "2021-01-31"],
+    .groups = "drop"
+  ) |>
+  mutate(price_difference = jan2021_price - jan2020_price) |>
+  filter(!is.na(price_difference)) |>
+
+  arrange(price_difference) |>
+  slice(1:10) |>
+  select(-.groups) |>
+  rename(borough = county)
+
+knitr::kable(head(price_change, 10))
+```
+The neighborhoods with the biggest price change are mostly in the lower Manhattan area and are considered pretty expensive today. This can be a reflection of an outflux of residents during covid and a return by 2025.
+
+
